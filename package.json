@@ -1,10 +1,15 @@
 {
   "name": "hardhat-fundme",
+  "author": "Adedeji Tewogbade",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx hardhat test",
+    "test:staging": "npx hardhat test --network sepolia",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "lint:fix": "solhint 'contracts/**/*.sol' --fix",
+    "coverage": "npx hardhat coverage"
   },
   "keywords": [],
   "author": "",
