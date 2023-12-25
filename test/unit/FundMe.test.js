@@ -19,12 +19,12 @@ describe("FundMe", () => {
 
     describe("constructor", () => {
         it("Sets the aggragator address correctly", async () => {
-            const response = await FundMeContract.priceFeed()
+            const response = await FundMeContract.getPriceFeed()
             const address = await MockV3Aggregator.getAddress()
             assert.equal(response, address)
         })
         it("Sets the contract owner variable address to the deploper", async () => {
-            const expectedValue = await FundMeContract.owner()
+            const expectedValue = await FundMeContract.getOwner()
             assert.equal(contractDeployer, expectedValue)
         })
     })
@@ -36,12 +36,12 @@ describe("FundMe", () => {
         it("Updated the amount funded data structure", async () => {
             await FundMeContract.fund({ value: sendValue })
             const response =
-                await FundMeContract.addressToAmountFunded(contractDeployer)
+                await FundMeContract.getAmountAdded(contractDeployer)
             assert.equal(response.toString(), sendValue.toString())
         })
         it("updated the funders data stucture", async () => {
             await FundMeContract.fund({ value: sendValue })
-            const funder = await FundMeContract.funders(0)
+            const funder = await FundMeContract.getFunder(0)
             assert.equal(funder, contractDeployer)
         })
     })
@@ -75,6 +75,33 @@ describe("FundMe", () => {
                 (endingDeployerBalance + gasCost).toString(),
             )
         })
+
+        it("cheaper withdraw ETH from a single funder", async () => {
+            // Arrange
+            const startingFundMeBalance = await ethers.provider.getBalance(
+                await FundMeContract.getAddress(),
+            )
+            const startingDeployerBalance =
+                await ethers.provider.getBalance(contractDeployer)
+            // Act
+            const transactionResponse = await FundMeContract.cheaperWithdraw()
+            const transactionReceipt = await transactionResponse.wait()
+            const { gasUsed, gasPrice } = transactionReceipt
+            const gasCost = gasUsed * gasPrice
+
+            const endingFundMeBalance = await ethers.provider.getBalance(
+                await FundMeContract.getAddress(),
+            )
+            const endingDeployerBalance =
+                await ethers.provider.getBalance(contractDeployer)
+            //Assert
+            assert.equal(endingFundMeBalance.toString(), 0)
+            assert.equal(
+                (startingFundMeBalance + startingDeployerBalance).toString(),
+                (endingDeployerBalance + gasCost).toString(),
+            )
+        })
+
         it("Only allows the owner to withdraw", async function () {
             const accounts = await ethers.getSigners()
             const fundMeConnectedContract = await FundMeContract.connect(

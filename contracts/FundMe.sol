@@ -13,22 +13,22 @@ error FundMe__NotOwner();
 contract FundMe {
     using PriceConverter for uint256;
 
-    uint public constant minimumUsd = 10 * 1e18;
-    address[] public funders;
-    mapping(address => uint256) public addressToAmountFunded;
-    address public immutable owner;
-    AggregatorV3Interface public priceFeed;
+    uint public constant MINIMUM_USD = 10 * 1e18;
+    address[] private s_funders;
+    mapping(address => uint256) private s_addressToAmountFunded;
+    address private immutable i_owner;
+    AggregatorV3Interface private s_priceFeed;
 
     modifier onlyOwner() {
-        if (msg.sender != owner) {
+        if (msg.sender != i_owner) {
             revert FundMe__NotOwner();
         }
         _;
     }
 
     constructor(address priceFeedAddress) {
-        owner = msg.sender;
-        priceFeed = AggregatorV3Interface(priceFeedAddress);
+        i_owner = msg.sender;
+        s_priceFeed = AggregatorV3Interface(priceFeedAddress);
     }
 
     // receive() external payable {
@@ -45,32 +45,69 @@ contract FundMe {
      */
     function fund() public payable {
         require(
-            msg.value.getConversionRate(priceFeed) >= minimumUsd,
+            msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD,
             "You should send atleast I eth"
         );
-        funders.push(msg.sender);
-        addressToAmountFunded[msg.sender] = msg.value;
+        s_funders.push(msg.sender);
+        s_addressToAmountFunded[msg.sender] = msg.value;
     }
 
     /**
      * @notice This function withdraw the funds in the contract
      * @dev This implements price feeds as our library
      */
-    function withdraw() public onlyOwner {
+    function withdraw() public payable onlyOwner {
+        for (
+            uint256 funderIndex = 0;
+            funderIndex < s_funders.length;
+            funderIndex++
+        ) {
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        // reset the array
+        s_funders = new address[](0);
+        // send eth
+        (bool callSuccess, ) = payable(msg.sender).call{
+            value: address(this).balance
+        }("");
+        require(callSuccess, "Call failed");
+    }
+
+    function cheaperWithdraw() public payable onlyOwner {
+        address[] memory funders = s_funders;
         for (
             uint256 funderIndex = 0;
             funderIndex < funders.length;
             funderIndex++
         ) {
             address funder = funders[funderIndex];
-            addressToAmountFunded[funder] = 0;
+            s_addressToAmountFunded[funder] = 0;
         }
         // reset the array
-        funders = new address[](0);
+        s_funders = new address[](0);
         // send eth
         (bool callSuccess, ) = payable(msg.sender).call{
             value: address(this).balance
         }("");
         require(callSuccess, "Call failed");
+    }
+
+    function getOwner() public view returns (address) {
+        return i_owner;
+    }
+
+    function getFunder(uint256 funderIndex) public view returns (address) {
+        return s_funders[funderIndex];
+    }
+
+    function getAmountAdded(
+        address funderAdress
+    ) public view returns (uint256) {
+        return s_addressToAmountFunded[funderAdress];
+    }
+
+    function getPriceFeed() public view returns (AggregatorV3Interface) {
+        return s_priceFeed;
     }
 }
